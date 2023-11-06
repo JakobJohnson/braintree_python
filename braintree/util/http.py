@@ -130,7 +130,13 @@ class Http(object):
                 verify=verify,
                 timeout=self.config.timeout)
 
-        return [response.status_code, response.text]
+        # Resolve version inconsistency in relation to requests package; Solution here: https://stackoverflow.com/questions/68526912/braintree-client-token-generate-method-throws-an-xml-error-inside-django
+        ver = sys.version_info
+
+        if ver.major == 3 and ver.minor > 5:
+            return [response.status_code, response.content]
+        else:
+            return [response.status_code, response.text]
 
     def handle_exception(self, exception):
         if isinstance(exception, requests.exceptions.ReadTimeout):
