@@ -4,6 +4,7 @@ from braintree.test.credit_card_numbers import CreditCardNumbers
 from braintree.test.nonces import Nonces
 from braintree.dispute import Dispute
 from braintree.payment_instrument_type import PaymentInstrumentType
+from datetime import date
 
 class TestTransaction(unittest.TestCase):
 
@@ -201,22 +202,6 @@ class TestTransaction(unittest.TestCase):
         self.assertTrue(result.is_success)
         self.assertNotEqual(result.transaction.network_transaction_id, "")
 
-    def test_sale_with_external_vault_validation_error_unsupported_payment_instrument_type(self):
-        result = Transaction.sale({
-            "amount": "10.00",
-            "payment_method_nonce": Nonces.ApplePayVisa,
-            "external_vault": {
-                "status": "vaulted",
-                "previous_network_transaction_id": "123456789012345"
-            }
-        })
-
-        self.assertFalse(result.is_success)
-        self.assertEqual(
-            ErrorCodes.Transaction.PaymentInstrumentWithExternalVaultIsInvalid,
-            result.errors.for_object("transaction")[0].code
-        )
-
     def test_sale_with_external_vault_validation_error_invalid_status(self):
         result = Transaction.sale({
             "amount": TransactionAmounts.Authorize,
@@ -354,6 +339,7 @@ class TestTransaction(unittest.TestCase):
                 "locality": "Chicago",
                 "region": "IL",
                 "phone_number": "122-555-1237",
+                "international_phone": {"country_code": "1", "national_number": "3121234567"},
                 "postal_code": "60622",
                 "country_name": "United States of America",
                 "country_code_alpha2": "US",
@@ -369,6 +355,7 @@ class TestTransaction(unittest.TestCase):
                 "locality": "Bartlett",
                 "region": "IL",
                 "phone_number": "122-555-1236",
+                "international_phone": {"country_code": "1", "national_number": "3121234567"},
                 "postal_code": "60103",
                 "country_name": "Mexico",
                 "country_code_alpha2": "MX",
@@ -392,7 +379,7 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(datetime, type(transaction.updated_at))
         self.assertEqual("510510", transaction.credit_card_details.bin)
         self.assertEqual("5100", transaction.credit_card_details.last_4)
-        self.assertEqual("510510******5100", transaction.credit_card_details.masked_number)
+        self.assertEqual("51051051****5100", transaction.credit_card_details.masked_number)
         self.assertEqual("MasterCard", transaction.credit_card_details.card_type)
         self.assertEqual("The Cardholder", transaction.credit_card_details.cardholder_name)
         self.assertEqual(None, transaction.avs_error_response_code)
@@ -417,6 +404,8 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual("US", transaction.billing_details.country_code_alpha2)
         self.assertEqual("USA", transaction.billing_details.country_code_alpha3)
         self.assertEqual("840", transaction.billing_details.country_code_numeric)
+        self.assertEqual("1", transaction.billing_details.international_phone["country_code"])
+        self.assertEqual("3121234567", transaction.billing_details.international_phone["national_number"])
         self.assertEqual("Andrew", transaction.shipping_details.first_name)
         self.assertEqual("Mason", transaction.shipping_details.last_name)
         self.assertEqual("Braintree", transaction.shipping_details.company)
@@ -429,6 +418,8 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual("MX", transaction.shipping_details.country_code_alpha2)
         self.assertEqual("MEX", transaction.shipping_details.country_code_alpha3)
         self.assertEqual("484", transaction.shipping_details.country_code_numeric)
+        self.assertEqual("1", transaction.shipping_details.international_phone["country_code"])
+        self.assertEqual("3121234567", transaction.shipping_details.international_phone["national_number"])
         self.assertEqual(None, transaction.additional_processor_response)
 
     def test_sale_with_exchange_rate_quote_id(self):
@@ -546,7 +537,7 @@ class TestTransaction(unittest.TestCase):
 
         self.assertTrue(result.is_success)
         transaction = result.transaction
-        self.assertEqual(transaction.credit_card_details.masked_number, "411111******1111")
+        self.assertEqual(transaction.credit_card_details.masked_number, "41111111****1111")
         self.assertEqual(None, transaction.vault_credit_card)
 
     def test_sale_with_vault_customer_and_credit_card_data_and_store_in_vault(self):
@@ -569,7 +560,7 @@ class TestTransaction(unittest.TestCase):
 
         self.assertTrue(result.is_success)
         transaction = result.transaction
-        self.assertEqual("411111******1111", transaction.credit_card_details.masked_number)
+        self.assertEqual("41111111****1111", transaction.credit_card_details.masked_number)
         self.assertEqual("411111******1111", transaction.vault_credit_card.masked_number)
 
     def test_sale_with_venmo_merchant_data(self):
@@ -836,6 +827,27 @@ class TestTransaction(unittest.TestCase):
         transaction = result.transaction
         self.assertEqual(Decimal("1.00"), transaction.discount_amount)
         self.assertEqual(Decimal("2.00"), transaction.shipping_amount)
+        self.assertEqual("12345", transaction.ships_from_postal_code)
+
+    def test_sale_with_shipping_tax_amount(self):
+        result = Transaction.sale({
+            "amount": TransactionAmounts.Authorize,
+            "purchase_order_number": "12345",
+            "discount_amount": Decimal("1.00"),
+            "shipping_amount": Decimal("2.00"),
+            "shipping_tax_amount": Decimal("3.00"),
+            "ships_from_postal_code": "12345",
+            "credit_card": {
+                "number": "4111111111111111",
+                "expiration_date": "05/2009"
+            }
+        })
+
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertEqual(Decimal("1.00"), transaction.discount_amount)
+        self.assertEqual(Decimal("2.00"), transaction.shipping_amount)
+        self.assertEqual(Decimal("3.00"), transaction.shipping_tax_amount)
         self.assertEqual("12345", transaction.ships_from_postal_code)
 
     def test_sca_exemption_successful_result(self):
@@ -2417,6 +2429,126 @@ class TestTransaction(unittest.TestCase):
             result.errors.for_object("transaction").for_object("line_items").for_object("index_1").on("unit_amount")[0].code
         )
 
+    def test_sale_with_line_items_accepts_valid_image_url_and_upc_code_and_type(self):
+        result = Transaction.sale({
+            "amount": "35.05",
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2009",
+            },
+            "line_items": [{
+                "quantity": "1.0232",
+                "name": "Name #1",
+                "kind": TransactionLineItem.Kind.Debit,
+                "unit_amount": "45.1232",
+                "unit_of_measure": "gallon",
+                "discount_amount": "1.02",
+                "total_amount": "45.15",
+                "product_code": "23434",
+                "commodity_code": "9SAASSD8724",
+                "upc_code": "1234567890",
+                "upc_type": "UPC-A",
+                "image_url": "https://google.com/image.png",
+            }]
+        })
+        self.assertTrue(result.is_success)
+        line_items = result.transaction.line_items
+
+        lineItem = line_items[0]
+        self.assertEqual("1234567890", lineItem.upc_code)
+        self.assertEqual("UPC-A", lineItem.upc_type)
+
+    def test_sale_with_line_items_returns_validation_errors_for_upc_code_too_long_and_type_invalid(self):
+        result = Transaction.sale({
+            "amount": "35.05",
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2009",
+                },
+            "line_items": [{
+                "quantity": "1.0232",
+                "name": "Name #1",
+                "kind": TransactionLineItem.Kind.Debit,
+                "unit_amount": "45.1232",
+                "unit_of_measure": "gallon",
+                "discount_amount": "1.02",
+                "total_amount": "45.15",
+                "product_code": "23434",
+                "commodity_code": "9SAASSD8724",
+                "upc_code": "THISCODEISABITTOOLONG",
+                "upc_type": "invalid",
+                "image_url": "https://google.com/image.png",
+                }]
+            })
+
+        self.assertFalse(result.is_success)
+
+        self.assertEqual(
+                ErrorCodes.Transaction.LineItem.UPCCodeIsTooLong,
+                result.errors.for_object("transaction").for_object("line_items").for_object("index_0").on("upc_code")[0].code
+                )
+        self.assertEqual(
+                ErrorCodes.Transaction.LineItem.UPCTypeIsInvalid,
+                result.errors.for_object("transaction").for_object("line_items").for_object("index_0").on("upc_type")[0].code
+                )
+
+    def test_sale_with_line_items_returns_UPC_code_missing_error(self):
+        result = Transaction.sale({
+            "amount": "35.05",
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2009",
+                },
+            "line_items": [{
+                "quantity": "1.0232",
+                "name": "Name #1",
+                "kind": TransactionLineItem.Kind.Debit,
+                "unit_amount": "45.1232",
+                "unit_of_measure": "gallon",
+                "discount_amount": "1.02",
+                "total_amount": "45.15",
+                "product_code": "23434",
+                "commodity_code": "9SAASSD8724",
+                "upc_type": "UPC-B",
+                }]
+            })
+
+        self.assertFalse(result.is_success)
+
+        self.assertEqual(
+                ErrorCodes.Transaction.LineItem.UPCCodeIsMissing,
+                result.errors.for_object("transaction").for_object("line_items").for_object("index_0").on("upc_code")[0].code
+                )
+
+    def test_sale_with_line_items_returns_UPC_type_missing_error(self):
+        result = Transaction.sale({
+            "amount": "35.05",
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2009",
+                },
+            "line_items": [{
+                "quantity": "1.0232",
+                "name": "Name #1",
+                "kind": TransactionLineItem.Kind.Debit,
+                "unit_amount": "45.1232",
+                "unit_of_measure": "gallon",
+                "discount_amount": "1.02",
+                "total_amount": "45.15",
+                "product_code": "23434",
+                "commodity_code": "9SAASSD8724",
+                "upc_code": "00000000000000",
+                }]
+            })
+
+        self.assertFalse(result.is_success)
+
+        self.assertEqual(
+                ErrorCodes.Transaction.LineItem.UPCTypeIsMissing,
+                result.errors.for_object("transaction").for_object("line_items").for_object("index_0").on("upc_type")[0].code
+                )
+
+
     def test_sale_with_amount_not_supported_by_processor(self):
         result = Transaction.sale({
             "amount": "0.2",
@@ -2619,6 +2751,37 @@ class TestTransaction(unittest.TestCase):
             result.errors.for_object("transaction").on("line_items")[0].code
         )
 
+    def test_sale_with_debit_network(self):
+        result = Transaction.sale({
+        
+        "amount": TransactionAmounts.Authorize,
+            "merchant_account_id": TestHelper.pinless_debit_merchant_account_id,
+            "payment_method_nonce": Nonces.TransactablePinlessDebitVisa,
+            "options": {
+                "submit_for_settlement": True
+            }
+        })
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertTrue(hasattr(transaction, 'debit_network'))
+        self.assertIsNotNone(transaction.debit_network)
+
+    def test_pinless_eligible_sale_with_process_debit_as_credit(self):
+        result = Transaction.sale({
+            "amount": TransactionAmounts.Authorize,
+            "merchant_account_id": TestHelper.pinless_debit_merchant_account_id,
+            "payment_method_nonce": Nonces.TransactablePinlessDebitVisa,
+            "options": {
+                "submit_for_settlement": True,
+                "credit_card":{
+                    "process_debit_as_credit": True,
+                }
+            }
+        })
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertIsNone(transaction.debit_network)
+
     def test_validation_error_on_invalid_custom_fields(self):
         result = Transaction.sale({
             "amount": TransactionAmounts.Authorize,
@@ -2650,14 +2813,15 @@ class TestTransaction(unittest.TestCase):
 
         self.assertTrue(result.is_success)
         transaction = result.transaction
-        self.assertEqual(CreditCard.Prepaid.Unknown, transaction.credit_card_details.prepaid)
-        self.assertEqual(CreditCard.Debit.Unknown, transaction.credit_card_details.debit)
+        self.assertEqual(CreditCard.CardTypeIndicator.Unknown, transaction.credit_card_details.country_of_issuance)
+        self.assertEqual(CreditCard.CardTypeIndicator.Unknown, transaction.credit_card_details.issuing_bank)
         self.assertEqual(CreditCard.Commercial.Unknown, transaction.credit_card_details.commercial)
+        self.assertEqual(CreditCard.Debit.Unknown, transaction.credit_card_details.debit)
+        self.assertEqual(CreditCard.DurbinRegulated.Unknown, transaction.credit_card_details.durbin_regulated)
         self.assertEqual(CreditCard.Healthcare.Unknown, transaction.credit_card_details.healthcare)
         self.assertEqual(CreditCard.Payroll.Unknown, transaction.credit_card_details.payroll)
-        self.assertEqual(CreditCard.DurbinRegulated.Unknown, transaction.credit_card_details.durbin_regulated)
-        self.assertEqual(CreditCard.CardTypeIndicator.Unknown, transaction.credit_card_details.issuing_bank)
-        self.assertEqual(CreditCard.CardTypeIndicator.Unknown, transaction.credit_card_details.country_of_issuance)
+        self.assertEqual(CreditCard.Prepaid.Unknown, transaction.credit_card_details.prepaid)
+        self.assertEqual(CreditCard.PrepaidReloadable.Unknown, transaction.credit_card_details.prepaid_reloadable)
         self.assertEqual(CreditCard.ProductId.Unknown, transaction.credit_card_details.product_id)
 
     def test_create_can_set_recurring_flag(self):
@@ -3395,6 +3559,7 @@ class TestTransaction(unittest.TestCase):
         params = {
                 "discount_amount": "12.33",
                 "shipping_amount": "5.00",
+                "shipping_tax_amount": "2.00",
                 "ships_from_postal_code": "90210",
                 "line_items": [{
                     "quantity": "1.0232",
@@ -3407,6 +3572,7 @@ class TestTransaction(unittest.TestCase):
 
         submitted_transaction = Transaction.submit_for_settlement(transaction.id, Decimal("900"), params).transaction
 
+        self.assertEqual(Decimal("2.00"), submitted_transaction.shipping_tax_amount)
         self.assertEqual(Transaction.Status.SubmittedForSettlement, submitted_transaction.status)
 
     def test_submit_for_settlement_with_shipping_data(self):
@@ -4525,7 +4691,7 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(Decimal("123.45"), clone_transaction.amount)
         self.assertEqual("MyShoppingCartProvider", clone_transaction.channel)
         self.assertEqual("123", clone_transaction.order_id)
-        self.assertEqual("510510******5100", clone_transaction.credit_card_details.masked_number)
+        self.assertEqual("51051051****5100", clone_transaction.credit_card_details.masked_number)
         self.assertEqual("Dan", clone_transaction.customer_details.first_name)
         self.assertEqual("Carl", clone_transaction.billing_details.first_name)
         self.assertEqual("Andrew", clone_transaction.shipping_details.first_name)
@@ -4598,6 +4764,8 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(Transaction.Status.GatewayRejected, result.transaction.status)
         self.assertEqual(Transaction.GatewayRejectionReason.ThreeDSecure, result.transaction.gateway_rejection_reason)
 
+    # NEXT_MAJOR_VERSION Remove this test
+    # three_d_secure_token is deprecated in favor of three_d_secure_authentication_id
     def test_sale_with_three_d_secure_token(self):
         three_d_secure_token = TestHelper.create_3ds_verification(TestHelper.three_d_secure_merchant_account_id, {
             "number": "4111111111111111",
@@ -4617,6 +4785,8 @@ class TestTransaction(unittest.TestCase):
 
         self.assertTrue(result.is_success)
 
+    # NEXT_MAJOR_VERSION Remove this test
+    # three_d_secure_token is deprecated in favor of three_d_secure_authentication_id
     def test_sale_without_three_d_secure_token(self):
         result = Transaction.sale({
             "merchant_account_id": TestHelper.three_d_secure_merchant_account_id,
@@ -4629,6 +4799,8 @@ class TestTransaction(unittest.TestCase):
 
         self.assertTrue(result.is_success)
 
+    # NEXT_MAJOR_VERSION Remove this test
+    # three_d_secure_token is deprecated in favor of three_d_secure_authentication_id
     def test_sale_returns_error_with_none_three_d_secure_token(self):
         result = Transaction.sale({
             "merchant_account_id": TestHelper.three_d_secure_merchant_account_id,
@@ -4646,6 +4818,8 @@ class TestTransaction(unittest.TestCase):
             result.errors.for_object("transaction").on("three_d_secure_token")[0].code
         )
 
+    # NEXT_MAJOR_VERSION Remove this test
+    # three_d_secure_token is deprecated in favor of three_d_secure_authentication_id
     def test_sale_returns_error_with_mismatched_3ds_verification_data(self):
         three_d_secure_token = TestHelper.create_3ds_verification(TestHelper.three_d_secure_merchant_account_id, {
             "number": "4111111111111111",
@@ -4874,7 +5048,7 @@ class TestTransaction(unittest.TestCase):
             result.errors.for_object("transaction").on("merchant_account_id")[0].code
         )
 
-    def test_transaction_with_three_d_secure_pass_thru_with_missing_eci_flag(self):
+    def test_transaction_with_three_d_secure_pass_thru_error(self):
         result = Transaction.sale({
             "merchant_account_id": TestHelper.three_d_secure_merchant_account_id,
             "amount": TransactionAmounts.Authorize,
@@ -4893,154 +5067,6 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(
             ErrorCodes.Transaction.ThreeDSecureEciFlagIsRequired,
             result.errors.for_object("transaction").for_object("three_d_secure_pass_thru").on("eci_flag")[0].code
-        )
-
-
-    def test_transaction_with_three_d_secure_pass_thru_with_missing_cavv_and_xid(self):
-        result = Transaction.sale({
-            "merchant_account_id": TestHelper.three_d_secure_merchant_account_id,
-            "amount": TransactionAmounts.Authorize,
-            "credit_card": {
-                "number": "4111111111111111",
-                "expiration_date": "05/2009"
-            },
-            "three_d_secure_pass_thru": {
-                "eci_flag": "05",
-                "cavv": "",
-                "xid": ""
-            }
-        })
-
-        self.assertFalse(result.is_success)
-        self.assertEqual(
-            ErrorCodes.Transaction.ThreeDSecureCavvIsRequired,
-            result.errors.for_object("transaction").for_object("three_d_secure_pass_thru").on("cavv")[0].code
-        )
-
-    def test_transaction_with_three_d_secure_pass_thru_with_invalid_eci_flag(self):
-        result = Transaction.sale({
-            "merchant_account_id": TestHelper.three_d_secure_merchant_account_id,
-            "amount": TransactionAmounts.Authorize,
-            "credit_card": {
-                "number": "4111111111111111",
-                "expiration_date": "05/2009"
-            },
-            "three_d_secure_pass_thru": {
-                "eci_flag": "bad_eci_flag",
-                "cavv": "some-cavv",
-                "xid": "some-xid"
-            }
-        })
-
-        self.assertFalse(result.is_success)
-        self.assertEqual(
-            ErrorCodes.Transaction.ThreeDSecureEciFlagIsInvalid,
-            result.errors.for_object("transaction").for_object("three_d_secure_pass_thru").on("eci_flag")[0].code
-        )
-
-    def test_transaction_with_three_d_secure_adyen_pass_thru(self):
-        result = Transaction.sale({
-            "merchant_account_id": TestHelper.adyen_merchant_account_id,
-            "amount": TransactionAmounts.Authorize,
-            "credit_card": {
-                "number": "4111111111111111",
-                "expiration_date": ExpirationHelper.ADYEN.value,
-                "cvv": "737"
-            },
-            "three_d_secure_pass_thru": {
-                "eci_flag": "02",
-                "cavv": "some-cavv",
-                "xid": "some-xid",
-                "authentication_response": "Y",
-                "directory_response": "Y",
-                "cavv_algorithm": "2",
-                "ds_transaction_id": "dstrxid-present",
-                "three_d_secure_version": "1.0.2",
-            }
-        })
-
-        self.assertTrue(result.is_success)
-        self.assertEqual(Transaction.Status.Authorized, result.transaction.status)
-
-    def test_transaction_with_three_d_secure_adyen_pass_thru_missing_authentication_response(self):
-        result = Transaction.sale({
-            "merchant_account_id": TestHelper.adyen_merchant_account_id,
-            "amount": TransactionAmounts.Authorize,
-            "credit_card": {
-                "number": "4111111111111111",
-                "expiration_date": ExpirationHelper.ADYEN.value,
-                "cvv": "737"
-                },
-            "three_d_secure_pass_thru": {
-                "eci_flag": "02",
-                "cavv": "some-cavv",
-                "xid": "some-xid",
-                "authentication_response": "",
-                "directory_response": "Y",
-                "cavv_algorithm": "2",
-                "ds_transaction_id": "dstrxid-present",
-                "three_d_secure_version": "1.0.2",
-            }
-        })
-
-        self.assertFalse(result.is_success)
-        self.assertEqual(
-            ErrorCodes.Transaction.ThreeDSecureAuthenticationResponseIsInvalid,
-            result.errors.for_object("transaction").for_object("three_d_secure_pass_thru").on("authentication_response")[0].code
-        )
-
-    def test_transaction_with_three_d_secure_adyen_pass_thru_missing_directory_response(self):
-        result = Transaction.sale({
-            "merchant_account_id": TestHelper.adyen_merchant_account_id,
-            "amount": TransactionAmounts.Authorize,
-            "credit_card": {
-                "number": "4111111111111111",
-                "expiration_date": ExpirationHelper.ADYEN.value,
-                "cvv": "737"
-            },
-            "three_d_secure_pass_thru": {
-                "eci_flag": "02",
-                "cavv": "some-cavv",
-                "xid": "some-xid",
-                "authentication_response": "Y",
-                "directory_response": "",
-                "cavv_algorithm": "2",
-                "ds_transaction_id": "dstrxid-present",
-                "three_d_secure_version": "1.0.2",
-            }
-        })
-
-        self.assertFalse(result.is_success)
-        self.assertEqual(
-            ErrorCodes.Transaction.ThreeDSecureDirectoryResponseIsInvalid,
-            result.errors.for_object("transaction").for_object("three_d_secure_pass_thru").on("directory_response")[0].code
-        )
-
-    def test_transaction_with_three_d_secure_adyen_pass_thru_missing_cavv_algorithm(self):
-        result = Transaction.sale({
-            "merchant_account_id": TestHelper.adyen_merchant_account_id,
-            "amount": TransactionAmounts.Authorize,
-            "credit_card": {
-                "number": "4111111111111111",
-                "expiration_date": ExpirationHelper.ADYEN.value,
-                "cvv": "737"
-            },
-            "three_d_secure_pass_thru": {
-                "eci_flag": "02",
-                "cavv": "some-cavv",
-                "xid": "some-xid",
-                "authentication_response": "Y",
-                "directory_response": "Y",
-                "cavv_algorithm": "",
-                "ds_transaction_id": "dstrxid-present",
-                "three_d_secure_version": "1.0.2",
-            }
-        })
-
-        self.assertFalse(result.is_success)
-        self.assertEqual(
-            ErrorCodes.Transaction.ThreeDSecureCavvAlgorithmIsInvalid,
-            result.errors.for_object("transaction").for_object("three_d_secure_pass_thru").on("cavv_algorithm")[0].code
         )
 
     @unittest.skip("until we have a more stable ci env")
@@ -5640,19 +5666,22 @@ class TestTransaction(unittest.TestCase):
         transaction = result.transaction
         details = transaction.meta_checkout_card_details
 
+        next_year = str(date.today().year + 1)
+        
         self.assertEqual(details.bin, "401288")
         self.assertEqual(details.card_type, "Visa")
         self.assertEqual(details.cardholder_name, "Meta Checkout Card Cardholder")
         self.assertEqual(details.container_id, "container123")
         self.assertEqual(details.customer_location, "US")
-        self.assertEqual(details.expiration_date, "12/2024")
+        self.assertEqual(details.expiration_date, "12/" + next_year)
         self.assertEqual(details.expiration_month, "12")
-        self.assertEqual(details.expiration_year, "2024")
+        self.assertEqual(details.expiration_year, next_year)
         self.assertEqual(details.image_url, "https://assets.braintreegateway.com/payment_method_logo/visa.png?environment=development")
         self.assertEqual(details.is_network_tokenized, False)
         self.assertEqual(details.last_4, "1881")
         self.assertEqual(details.masked_number, "401288******1881")
         self.assertEqual(details.prepaid, "No")
+        self.assertEqual(details.prepaid_reloadable, "Unknown")
 
     def test_creating_meta_checkout_token_transaction_with_fake_nonce(self):
         result = Transaction.sale({
@@ -5664,6 +5693,8 @@ class TestTransaction(unittest.TestCase):
         transaction = result.transaction
         details = transaction.meta_checkout_token_details
 
+        next_year = str(date.today().year + 1)
+        
         self.assertEqual(details.bin, "401288")
         self.assertEqual(details.card_type, "Visa")
         self.assertEqual(details.cardholder_name, "Meta Checkout Token Cardholder")
@@ -5671,14 +5702,15 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(details.cryptogram, "AlhlvxmN2ZKuAAESNFZ4GoABFA==")
         self.assertEqual(details.customer_location, "US")
         self.assertEqual(details.ecommerce_indicator, "07")
-        self.assertEqual(details.expiration_date, "12/2024")
+        self.assertEqual(details.expiration_date, "12/" + next_year)
         self.assertEqual(details.expiration_month, "12")
-        self.assertEqual(details.expiration_year, "2024")
+        self.assertEqual(details.expiration_year, next_year)
         self.assertEqual(details.image_url, "https://assets.braintreegateway.com/payment_method_logo/visa.png?environment=development")
         self.assertEqual(details.is_network_tokenized, True)
         self.assertEqual(details.last_4, "1881")
         self.assertEqual(details.masked_number, "401288******1881")
         self.assertEqual(details.prepaid, "No")
+        self.assertEqual(details.prepaid_reloadable, "Unknown")
 
     def test_creating_paypal_transaction_with_vaulted_token(self):
         customer_id = Customer.create().customer.id
@@ -5905,6 +5937,37 @@ class TestTransaction(unittest.TestCase):
 
         refreshed_authorized_transaction = Transaction.find(authorized_transaction.id)
         self.assertEqual(2, len(refreshed_authorized_transaction.partial_settlement_transaction_ids))
+
+    def test_transaction_submit_for_partial_settlement_with_final_capture(self):
+        result = Transaction.sale({
+            "amount": TransactionAmounts.Authorize,
+            "credit_card": {
+                "number": "4111111111111111",
+                "expiration_date": "05/2009"
+                }
+            })
+
+        self.assertTrue(result.is_success)
+
+        authorized_transaction = result.transaction
+        options = { "final_capture": "true" }
+        partial_settlement_result1 = Transaction.submit_for_partial_settlement(authorized_transaction.id, Decimal("500.00"))
+        partial_settlement_transaction1 = partial_settlement_result1.transaction
+        self.assertTrue(partial_settlement_result1.is_success)
+        self.assertEqual(partial_settlement_transaction1.amount, Decimal("500.00"))
+        self.assertEqual(Transaction.Status.SubmittedForSettlement, partial_settlement_transaction1.status)
+
+        refreshed_authorized_transaction1 = Transaction.find(authorized_transaction.id)
+        self.assertEqual(Transaction.Status.SettlementPending, refreshed_authorized_transaction1.status)
+
+        partial_settlement_result2 = Transaction.submit_for_partial_settlement(authorized_transaction.id, Decimal("100.00"), options)
+        partial_settlement_transaction2 = partial_settlement_result2.transaction
+        self.assertTrue(partial_settlement_result2.is_success)
+        self.assertEqual(partial_settlement_transaction2.amount, Decimal("100.00"))
+
+        refreshed_authorized_transaction2 = Transaction.find(authorized_transaction.id)
+        self.assertEqual(2, len(refreshed_authorized_transaction2.partial_settlement_transaction_ids))
+        self.assertEqual(Transaction.Status.SettlementPending, refreshed_authorized_transaction2.status)
 
     def test_transaction_submit_for_partial_settlement_unsuccessful(self):
         result = Transaction.sale({
@@ -6331,6 +6394,42 @@ class TestTransaction(unittest.TestCase):
         error_code = result.errors.for_object("transaction")[0].code
         self.assertEqual(ErrorCodes.Transaction.PaymentInstrumentNotSupportedByMerchantAccount, error_code)
 
+    def test_external_network_token_transaction_with_token_details(self):
+        result = Transaction.sale({
+            "amount": "10.00",
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "06/2009",
+                "network_tokenization_attributes": {
+                    "cryptogram": "/wAAAAAAAcb8AlGUF/1JQEkAAAA=",
+                    "ecommerce_indicator": "45310020105",
+                    "token_requestor_id" : "05"
+                    }
+                },
+            })
+
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertTrue(transaction.processed_with_network_token)
+        self.assertTrue(transaction.network_token['is_network_tokenized'])
+
+    def test_external_network_token_transaction_with_invalid_token_details(self):
+        result = Transaction.sale({
+            "amount": "10.00",
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "06/2009",
+                "network_tokenization_attributes": {
+                    "ecommerce_indicator": "45310020105",
+                    "token_requestor_id" : "05"
+                    }
+                },
+            })
+
+        self.assertFalse(result.is_success)
+        error_code = result.errors.for_object("transaction").for_object("credit_card").on("network_tokenization_attributes")[0].code
+        self.assertEqual(ErrorCodes.CreditCard.NetworkTokenizationAttributeCryptogramIsRequired, error_code)
+
     def test_adjust_authorization_for_successful_adjustment(self):
         initial_transaction_sale = Transaction.sale(self.__first_data_transaction_params())
         self.assertTrue(initial_transaction_sale.is_success)
@@ -6378,19 +6477,6 @@ class TestTransaction(unittest.TestCase):
 
         error_code = adjusted_authorization_result.errors.for_object("authorization_adjustment").on("base")[0].code
         self.assertEqual(ErrorCodes.Transaction.NoNetAmountToPerformAuthAdjustment, error_code)
-
-    def test_adjust_authorization_when_transaction_status_is_not_authorized(self):
-        additional_params = { "options": { "submit_for_settlement": True } }
-        merchant_params = { **self.__first_data_transaction_params(), **additional_params }
-        initial_transaction_sale =  Transaction.sale(merchant_params)
-        self.assertTrue(initial_transaction_sale.is_success)
-        adjusted_authorization_result = Transaction.adjust_authorization(initial_transaction_sale.transaction.id, "85.50")
-
-        self.assertFalse(adjusted_authorization_result.is_success)
-        self.assertEqual(adjusted_authorization_result.transaction.amount, Decimal("75.50"))
-
-        error_code = adjusted_authorization_result.errors.for_object("transaction").on("base")[0].code
-        self.assertEqual(ErrorCodes.Transaction.TransactionMustBeInStateAuthorized, error_code)
 
     def test_adjust_authorization_when_transaction_authorization_type_is_undfined_or_final(self):
         additional_params = { "transaction_source": "recurring" }
@@ -6455,3 +6541,65 @@ class TestTransaction(unittest.TestCase):
         self.assertEqual(Transaction.Status.ProcessorDeclined, transaction.status)
         self.assertEqual("01", transaction.merchant_advice_code)
         self.assertEqual("New account information available", transaction.merchant_advice_code_text)
+
+    def test_foreign_retailer_to_be_true_when_set_to_true_in_the_request(self):
+        result = Transaction.sale({
+            "amount": TransactionAmounts.Authorize,
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2025"
+            },
+            "foreign_retailer": "true",
+        })
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertTrue(transaction.foreign_retailer)
+
+    def test_foreign_retailer_to_be_skipped_when_set_to_false_in_the_request(self):
+        result = Transaction.sale({
+            "amount": TransactionAmounts.Authorize,
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2025"
+            },
+            "foreign_retailer": "false",
+        })
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertFalse(hasattr(transaction, 'foreign_retailer'))
+
+    def test_foreign_retailer_to_be_skipped_when_not_set_in_the_request(self):
+        result = Transaction.sale({
+            "amount": TransactionAmounts.Authorize,
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2025"
+            },
+        })
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+        self.assertFalse(hasattr(transaction, 'foreign_retailer')) 
+    
+    def test_contact_details_returned_fom_transaction(self):
+        result = Transaction.sale({
+            "amount": "10.00",
+            "payment_method_nonce": Nonces.PayPalOneTimePayment,
+            "paypal_account": {},
+            "options": {
+                "paypal": {}
+            }
+        })
+
+        self.assertTrue(result.is_success)
+        transaction = result.transaction
+
+        self.assertEqual(transaction.paypal_details.payer_email, "payer@example.com")
+        self.assertNotEqual(None, re.search(r'PAY-\w+', transaction.paypal_details.payment_id))
+        self.assertNotEqual(None, re.search(r'AUTH-\w+', transaction.paypal_details.authorization_id))
+        self.assertNotEqual(None, transaction.paypal_details.image_url)
+        self.assertNotEqual(None, transaction.paypal_details.debug_id)
+        self.assertTrue(hasattr(transaction.paypal_details, 'recipient_email'))
+        self.assertTrue(hasattr(transaction.paypal_details, 'recipient_phone'))
+        self.assertEqual(transaction.paypal_details.recipient_email, "test@paypal.com")
+      
+

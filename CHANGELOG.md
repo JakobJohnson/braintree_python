@@ -1,4 +1,68 @@
 # Changelog
+## 4.34.0
+* Add prepaid_reloadable from bin data in credit card responses
+* Add support for `PayPalPaymentResource` requests
+
+## 4.33.1
+* Fixes issue related to missing folders in package paths
+
+## 4.33.0
+* Add support for creating and updating PayPal customer session
+* Add support for getting PayPal customer recommendations
+
+## 4.32.0 
+* Add recipient/contact info: `recipient_email`and `recipient_phone` to `Transaction` 
+
+## 4.31.0
+* Add `fail_on_duplicate_payment_method_for_customer` option to 
+  * `ClientToken`
+  * `PaymentMethod`
+  * `CreditCard`
+* Add `blik_aliases` to LocalPaymentCompleted webhook and LocalPaymentDetail
+* Deprecate `samsung_pay_card`
+* Updated expiring pinned vendor SSL certificates
+
+## 4.30.0
+* Add `payer_name`, `bic` and `iban_last_chars` to LocalPaymentCompleted webhook
+* Add `edit_paypal_vault_id` to PayPalAccount
+* Add `ani_first_name_response_code` and `ani_last_name_response_code` to CreditCardVerification
+* Add `shippingTaxAmount` to Transaction
+* Add `network_tokenization_attributes` parameter to `Transaction.sale`
+* Add validation error code `NetworkTokenizationAttributeCryptogramIsRequired` to `CreditCard`
+
+## 4.29.0
+* Add `foreign_retailer` to Transaction
+* Add `international_phone` to `Address` and `Customer`
+* Add `funding_source_description` to PayPalAccount
+* Add missing `AndroidPayCard` error code
+* Add `REFUND_FAILED` to `WebhookNotification.Kind`
+* Add `final_capture` to Transaction `submit_for_partial_settlement_signature`
+* Deprecate `paypal_tracking_id` in favor of `paypal_tracker_id` in `package_details`
+
+## 4.28.0
+* Add `domains` parameter support to `ClientToken.generate`
+
+## 4.27.0
+* Add `UnderReview` status to `Dispute`
+* Add `DisputeUnderReview` to `WebhookNotification.Kind`
+
+## 4.26.0
+* Remove usage of standard library deprecated `cgi` module. _Note: this will break integrations on versions of Python below 3.2. However, this is NOT a breaking change to this library, due to our current support of Python 3.5+._
+* Add `PackageDetails` class.
+* Add `packages` to `Transaction` attributes.
+* Add `package_tracking` method to `TransactionGateway` to make request to add tracking information to transactions.
+* Add `process_debit_as_credit` to `credit_card` field in `options` field during Transaction create.
+* Deprecate `three_d_secure_token` in favor of `three_d_secure_authentication_id`
+* Add `upc_code`, `upc_type`, and `image_url` to `line_items` in `transaction`
+* Deprecate `venmo_sdk_session` and `venmo_sdk_payment_method_code`
+
+## 4.25.0
+* Add `PickupInStore` to `ShippingMethod` enum
+* Add `external_vault` and `risk_data` to `CreditCardVerification.create` request
+* Add `phone_number` in `CreditCard`
+* Add `debit_network` to `Transaction` field
+* Add `debit_network` to `TransactionSearch` Request
+* Add `DebitNetwork` enum to `CreditCard`
 
 ## 4.24.0
 * Add `SubscriptionBillingSkipped` to `WebhookNotification.Kind`

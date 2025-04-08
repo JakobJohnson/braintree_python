@@ -63,12 +63,6 @@ class WebhookTestingGateway(object):
             return self.__disbursement_exception_sample_xml(id)
         elif kind == WebhookNotification.Kind.Disbursement:
             return self.__disbursement_sample_xml(id)
-        elif kind == WebhookNotification.Kind.DisputeOpened:
-            return self.__dispute_opened_sample_xml(id)
-        elif kind == WebhookNotification.Kind.DisputeLost:
-            return self.__dispute_lost_sample_xml(id)
-        elif kind == WebhookNotification.Kind.DisputeWon:
-            return self.__dispute_won_sample_xml(id)
         elif kind == WebhookNotification.Kind.DisputeAccepted:
             return self.__dispute_accepted_sample_xml(id)
         elif kind == WebhookNotification.Kind.DisputeAutoAccepted:
@@ -77,6 +71,16 @@ class WebhookTestingGateway(object):
             return self.__dispute_disputed_sample_xml(id)
         elif kind == WebhookNotification.Kind.DisputeExpired:
             return self.__dispute_expired_sample_xml(id)
+        elif kind == WebhookNotification.Kind.DisputeLost:
+            return self.__dispute_lost_sample_xml(id)
+        elif kind == WebhookNotification.Kind.DisputeOpened:
+            return self.__dispute_opened_sample_xml(id)
+        elif kind == WebhookNotification.Kind.DisputeUnderReview:
+            return self.__dispute_under_review_sample_xml(id)
+        elif kind == WebhookNotification.Kind.DisputeWon:
+            return self.__dispute_won_sample_xml(id)
+        elif kind == WebhookNotification.Kind.RefundFailed:
+            return self.__refund_failed_sample_xml(id)
         elif kind == WebhookNotification.Kind.SubscriptionBillingSkipped:
             return self.__subscription_billing_skipped_sample_xml(id)
         elif kind == WebhookNotification.Kind.SubscriptionChargedSuccessfully:
@@ -94,7 +98,7 @@ class WebhookTestingGateway(object):
         elif kind == WebhookNotification.Kind.GrantedPaymentMethodRevoked:
             return self.__granted_payment_method_revoked(id)
         elif kind == WebhookNotification.Kind.LocalPaymentCompleted:
-            return self.__local_payment_completed()
+            return self.__local_payment_completed(id)
         elif kind == WebhookNotification.Kind.LocalPaymentExpired:
             return self.__local_payment_expired()
         elif kind == WebhookNotification.Kind.LocalPaymentFunded:
@@ -224,6 +228,12 @@ class WebhookTestingGateway(object):
             </disbursement>
         """ % id
 
+    def __dispute_under_review_sample_xml(self, id):
+        if id == "legacy_dispute_id":
+            return self.__old_dispute_under_review_sample_xml(id)
+        else:
+            return self.__new_dispute_under_review_sample_xml(id)
+
     def __dispute_opened_sample_xml(self, id):
         if id == "legacy_dispute_id":
             return self.__old_dispute_opened_sample_xml(id)
@@ -265,6 +275,25 @@ class WebhookTestingGateway(object):
             return self.__old_dispute_expired_sample_xml(id)
         else:
             return self.__new_dispute_expired_sample_xml(id)
+
+    def __old_dispute_under_review_sample_xml(self, id):
+        return """
+            <dispute>
+              <amount>250.00</amount>
+              <currency-iso-code>USD</currency-iso-code>
+              <received-date type="date">2014-03-01</received-date>
+              <reply-by-date type="date">2014-03-21</reply-by-date>
+              <kind>chargeback</kind>
+              <status>under_review</status>
+              <reason>fraud</reason>
+              <id>%s</id>
+              <transaction>
+                <id>%s</id>
+                <amount>250.00</amount>
+              </transaction>
+              <date-opened type="date">2014-03-28</date-opened>
+            </dispute>
+        """ % (id, id)
 
     def __old_dispute_opened_sample_xml(self, id):
         return """
@@ -398,6 +427,47 @@ class WebhookTestingGateway(object):
               </transaction>
               <date-opened type="date">2014-03-28</date-opened>
             </dispute>
+        """ % (id, id)
+
+    def __new_dispute_under_review_sample_xml(self, id):
+        return """
+        <dispute>
+          <id>%s</id>
+          <amount>100.00</amount>
+          <amount-disputed>100.00</amount-disputed>
+          <amount-won>95.00</amount-won>
+          <case-number>CASE-12345</case-number>
+          <created-at type="datetime">2017-06-16T20:44:41Z</created-at>
+          <currency-iso-code>USD</currency-iso-code>
+          <forwarded-comments nil="true"/>
+          <kind>chargeback</kind>
+          <merchant-account-id>ytnlulaloidoqwvzxjrdqputg</merchant-account-id>
+          <reason>fraud</reason>
+          <reason-code nil="true"/>
+          <reason-description nil="true"/>
+          <received-date type="date">2016-02-15</received-date>
+          <reference-number>REF-9876</reference-number>
+          <reply-by-date type="date">2016-02-22</reply-by-date>
+          <status>under_review</status>
+          <updated-at type="datetime">2017-06-16T20:44:41Z</updated-at>
+          <original-dispute-id>9qde5qgp</original-dispute-id>
+          <status-history type="array">
+            <status-history>
+              <status>under_review</status>
+              <timestamp type="datetime">2017-06-15T20:44:41Z</timestamp>
+            </status-history>
+          </status-history>
+          <evidence type="array"/>
+          <transaction>
+            <id>%s</id>
+            <amount>100.00</amount>
+            <created-at>2017-06-21T20:44:41Z</created-at>
+            <order-id nil="true"/>
+            <purchase-order-number nil="true"/>
+            <payment-instrument-subtype>Visa</payment-instrument-subtype>
+          </transaction>
+          <date-opened type=\"date\">2014-03-28</date-opened>
+        </dispute>
         """ % (id, id)
 
     def __new_dispute_opened_sample_xml(self, id):
@@ -742,6 +812,20 @@ class WebhookTestingGateway(object):
         </dispute>
         """ % (id, id)
 
+    def __refund_failed_sample_xml(self, id):
+        return """
+            <transaction>
+            <id>%s</id>
+            <amount>100</amount>
+            <credit-card>
+                <number>1234560000001234</number>
+                <cvv>123</cvv>
+            </credit-card>
+            <status>processor_declined</status>
+            <refunded-transaction-fk>1</refunded-transaction-fk>
+            </transaction>
+        """ % id
+
     def __subscription_sample_xml(self, id):
         return """
             <subscription>
@@ -936,11 +1020,45 @@ class WebhookTestingGateway(object):
             </paypal-account>
         """ % id
 
-    def __local_payment_completed(self):
+    def __local_payment_completed(self, id):
+        if id == "blik_one_click_id":
+            return self.__blik_one_click_local_payment_completed()
+        else:
+            return self.__default_local_payment_completed()
+
+    def __default_local_payment_completed(self):
         return """
             <local-payment>
-                <payment-id>a-payment-id</payment-id>
+                <bic>a-bic</bic>
+                <iban-last-chars>1234</iban-last-chars>
                 <payer-id>a-payer-id</payer-id>
+                <payer-id>a-payer-id</payer-id>
+                <payer-name>a-payer-name</payer-name>
+                <payment-id>a-payment-id</payment-id>
+                <payment-method-nonce>ee257d98-de40-47e8-96b3-a6954ea7a9a4</payment-method-nonce>
+                <transaction>
+                    <id>1</id>
+                    <status>authorizing</status>
+                    <amount>10.00</amount>
+                    <order-id>order1234</order-id>
+                </transaction>
+            </local-payment>
+            """
+    def __blik_one_click_local_payment_completed(self):
+        return """
+            <local-payment>
+                <bic>a-bic</bic>
+                <blik-aliases type='array'>
+                    <blik-alias>
+                        <key>alias-key-1</key>
+                        <label>alias-label-1</label>
+                    </blik-alias>
+                </blik-aliases>
+                <iban-last-chars>1234</iban-last-chars>
+                <payer-id>a-payer-id</payer-id>
+                <payer-id>a-payer-id</payer-id>
+                <payer-name>a-payer-name</payer-name>
+                <payment-id>a-payment-id</payment-id>
                 <payment-method-nonce>ee257d98-de40-47e8-96b3-a6954ea7a9a4</payment-method-nonce>
                 <transaction>
                     <id>1</id>

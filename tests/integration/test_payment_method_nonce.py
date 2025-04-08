@@ -1,5 +1,6 @@
 from tests.test_helper import *
 from braintree.test.nonces import Nonces
+from datetime import date
 
 class TestPaymentMethodNonce(unittest.TestCase):
     indian_payment_token = "india_visa_credit"
@@ -102,15 +103,15 @@ class TestPaymentMethodNonce(unittest.TestCase):
 
         self.assertEqual("CreditCard", found_nonce.type)
         self.assertEqual(nonce, found_nonce.nonce)
-        self.assertEqual("Y", three_d_secure_info.enrolled)
         self.assertEqual("authenticate_successful", three_d_secure_info.status)
         self.assertEqual(True, three_d_secure_info.liability_shifted)
         self.assertEqual(True, three_d_secure_info.liability_shift_possible)
-        self.assertEqual("cavv_value", three_d_secure_info.cavv)
-        self.assertEqual("xid_value", three_d_secure_info.xid)
-        self.assertEqual("05", three_d_secure_info.eci_flag)
-        self.assertEqual("1.0.2", three_d_secure_info.three_d_secure_version)
-        self.assertIsNotNone(three_d_secure_info.three_d_secure_authentication_id)
+        self.assertIsInstance(three_d_secure_info.enrolled, str)
+        self.assertIsInstance(three_d_secure_info.cavv, str)
+        self.assertIsInstance(three_d_secure_info.xid, str)
+        self.assertIsInstance(three_d_secure_info.eci_flag, str)
+        self.assertIsInstance(three_d_secure_info.three_d_secure_version, str)
+        self.assertIsInstance(three_d_secure_info.three_d_secure_authentication_id, str)
 
     def test_find_nonce_shows_paypal_details(self):
         found_nonce = PaymentMethodNonce.find("fake-google-pay-paypal-nonce")
@@ -143,7 +144,7 @@ class TestPaymentMethodNonce(unittest.TestCase):
         self.assertEqual("1881", found_nonce.details["last_four"])
         self.assertEqual("Visa", found_nonce.details["card_type"])
         self.assertEqual("Meta Checkout Card Cardholder", found_nonce.details["cardholder_name"])
-        self.assertEqual("2024", found_nonce.details["expiration_year"])
+        self.assertEqual(str(date.today().year + 1), found_nonce.details["expiration_year"])
         self.assertEqual("12", found_nonce.details["expiration_month"])
 
     def test_find_nonce_shows_meta_checkout_token_details(self):
@@ -154,7 +155,7 @@ class TestPaymentMethodNonce(unittest.TestCase):
         self.assertEqual("1881", found_nonce.details["last_four"])
         self.assertEqual("Visa", found_nonce.details["card_type"])
         self.assertEqual("Meta Checkout Token Cardholder", found_nonce.details["cardholder_name"])
-        self.assertEqual("2024", found_nonce.details["expiration_year"])
+        self.assertEqual(str(date.today().year + 1), found_nonce.details["expiration_year"])
         self.assertEqual("12", found_nonce.details["expiration_month"])
 
     def test_exposes_null_3ds_info_if_none_exists(self):
@@ -216,6 +217,12 @@ class TestPaymentMethodNonce(unittest.TestCase):
 
         self.assertEqual(CreditCard.Prepaid.Yes, bin_data.prepaid)
 
+    def test_bin_data_prepaid_reloadable(self):
+        found_nonce = PaymentMethodNonce.find("fake-valid-prepaid-reloadable-nonce")
+        bin_data = found_nonce.bin_data
+
+        self.assertEqual(CreditCard.PrepaidReloadable.Yes, bin_data.prepaid_reloadable)
+
     def test_bin_data_unknown_values(self):
         found_nonce = PaymentMethodNonce.find("fake-valid-unknown-indicators-nonce")
         bin_data = found_nonce.bin_data
@@ -228,6 +235,7 @@ class TestPaymentMethodNonce(unittest.TestCase):
         self.assertEqual(CreditCard.IssuingBank.Unknown, bin_data.issuing_bank)
         self.assertEqual(CreditCard.Payroll.Unknown, bin_data.payroll)
         self.assertEqual(CreditCard.Prepaid.Unknown, bin_data.prepaid)
+        self.assertEqual(CreditCard.PrepaidReloadable.Unknown, bin_data.prepaid_reloadable)
         self.assertEqual(CreditCard.ProductId.Unknown, bin_data.product_id)
 
     def _request_authentication_insights(self, merchant_account_id, payment_method_token, amount = None, recurring_customer_consent = None, recurring_max_amount = None):

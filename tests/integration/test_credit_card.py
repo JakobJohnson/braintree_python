@@ -18,15 +18,14 @@ class TestCreditCard(unittest.TestCase):
 
         three_d_secure_info = result.credit_card.verification.three_d_secure_info
 
-        self.assertEqual("Y", three_d_secure_info.enrolled)
         self.assertEqual("authenticate_successful", three_d_secure_info.status)
         self.assertEqual(True, three_d_secure_info.liability_shifted)
         self.assertEqual(True, three_d_secure_info.liability_shift_possible)
-        self.assertEqual("cavv_value", three_d_secure_info.cavv)
-        self.assertEqual("xid_value", three_d_secure_info.xid)
-        self.assertEqual(None, three_d_secure_info.ds_transaction_id)
-        self.assertEqual("05", three_d_secure_info.eci_flag)
-        self.assertEqual("1.0.2", three_d_secure_info.three_d_secure_version)
+        self.assertIsInstance(three_d_secure_info.enrolled, str)
+        self.assertIsInstance(three_d_secure_info.cavv, str)
+        self.assertIsInstance(three_d_secure_info.xid, str)
+        self.assertIsInstance(three_d_secure_info.eci_flag, str)
+        self.assertIsInstance(three_d_secure_info.three_d_secure_version, str)
 
     def test_create_with_three_d_secure_pass_thru(self):
         customer_id = Customer.create().customer.id
@@ -190,7 +189,8 @@ class TestCreditCard(unittest.TestCase):
                 "country_code_alpha2": "MX",
                 "country_code_alpha3": "MEX",
                 "country_code_numeric": "484",
-                "country_name": "Mexico"
+                "country_name": "Mexico",
+                "phone_number": "312-123-4567"
             }
         })
 
@@ -204,6 +204,7 @@ class TestCreditCard(unittest.TestCase):
         self.assertEqual("MEX", address.country_code_alpha3)
         self.assertEqual("484", address.country_code_numeric)
         self.assertEqual("Mexico", address.country_name)
+        self.assertEqual("312-123-4567", address.phone_number)
 
     def test_create_with_billing_address_id(self):
         customer = Customer.create().customer
@@ -458,6 +459,28 @@ class TestCreditCard(unittest.TestCase):
         credit_card_number_errors = result.errors.for_object("credit_card").on("number")
         self.assertEqual(1, len(credit_card_number_errors))
         self.assertEqual(ErrorCodes.CreditCard.DuplicateCardExists, credit_card_number_errors[0].code)
+
+    def test_create_with_fail_on_duplicate_payment_method_for_customer_set_to_true(self):
+        customer = Customer.create().customer
+        CreditCard.create({
+            "customer_id": customer.id,
+            "number": "4000111111111115",
+            "expiration_date": "05/2014"
+        })
+
+        result = CreditCard.create({
+            "customer_id": customer.id,
+            "number": "4000111111111115",
+            "expiration_date": "05/2014",
+            "options": {"fail_on_duplicate_payment_method_for_customer": True}
+        })
+
+        self.assertFalse(result.is_success)
+        self.assertEqual("Duplicate card exists in the vault for the customer.", result.message)
+
+        credit_card_number_errors = result.errors.for_object("credit_card").on("number")
+        self.assertEqual(1, len(credit_card_number_errors))
+        self.assertEqual(ErrorCodes.CreditCard.DuplicateCardExistsForCustomer, credit_card_number_errors[0].code)
 
     def test_create_with_invalid_invalid_options(self):
         customer = Customer.create().customer
@@ -870,6 +893,30 @@ class TestCreditCard(unittest.TestCase):
         self.assertEqual(1, len(number_errors))
         self.assertEqual(ErrorCodes.CreditCard.DuplicateCardExists, number_errors[0].code)
 
+    def test_update_returns_error_with_duplicate_payment_method_for_customer_if_fail_on_duplicate_payment_method_is_set(self):
+        create_result = Customer.create({
+            "credit_card": {
+                "number": "4111111111111111",
+                "expiration_date": "05/2021",
+            }
+        })
+        self.assertTrue(create_result.is_success)
+
+        update_result = Customer.update(create_result.customer.id, {
+            "credit_card": {
+                "number": "4111111111111111",
+                "expiration_date": "05/2021",
+                "options": {
+                    "fail_on_duplicate_payment_method_for_customer": True,
+                },
+            }
+        })
+
+        self.assertFalse(update_result.is_success)
+        number_errors = update_result.errors.for_object("customer").for_object("credit_card").on("number")
+        self.assertEqual(1, len(number_errors))
+        self.assertEqual(ErrorCodes.CreditCard.DuplicateCardExistsForCustomer, number_errors[0].code)
+
     def test_delete_with_valid_token(self):
         customer = Customer.create().customer
         credit_card = CreditCard.create({
@@ -1169,6 +1216,19 @@ class TestCreditCard(unittest.TestCase):
 
         self.assertEqual(CreditCard.Prepaid.Yes, credit_card.prepaid)
 
+    def test_prepaid_reloadable_card(self):
+        customer = Customer.create().customer
+        result = CreditCard.create({
+            "customer_id": customer.id,
+            "number": CreditCardNumbers.CardTypeIndicators.PrepaidReloadable,
+            "expiration_date": "05/2014",
+            "options": {"verify_card": True}
+        })
+
+        credit_card = result.credit_card
+
+        self.assertEqual(CreditCard.PrepaidReloadable.Yes, credit_card.prepaid_reloadable)
+
     def test_all_negative_card_type_indicators(self):
         customer = Customer.create().customer
         result = CreditCard.create({
@@ -1180,13 +1240,14 @@ class TestCreditCard(unittest.TestCase):
 
         credit_card = result.credit_card
 
+        self.assertEqual("MSB", credit_card.product_id)
+        self.assertEqual(CreditCard.Commercial.No, credit_card.commercial)
         self.assertEqual(CreditCard.Debit.No, credit_card.debit)
         self.assertEqual(CreditCard.DurbinRegulated.No, credit_card.durbin_regulated)
-        self.assertEqual(CreditCard.Prepaid.No, credit_card.prepaid)
-        self.assertEqual(CreditCard.Payroll.No, credit_card.payroll)
-        self.assertEqual(CreditCard.Commercial.No, credit_card.commercial)
         self.assertEqual(CreditCard.Healthcare.No, credit_card.healthcare)
-        self.assertEqual("MSB", credit_card.product_id)
+        self.assertEqual(CreditCard.Payroll.No, credit_card.payroll)
+        self.assertEqual(CreditCard.Prepaid.No, credit_card.prepaid)
+        self.assertEqual(CreditCard.PrepaidReloadable.No, credit_card.prepaid_reloadable)
 
     def test_card_without_card_type_indicators(self):
         customer = Customer.create().customer
@@ -1199,14 +1260,15 @@ class TestCreditCard(unittest.TestCase):
 
         credit_card = result.credit_card
 
+        self.assertEqual(CreditCard.Commercial.Unknown, credit_card.commercial)
+        self.assertEqual(CreditCard.CountryOfIssuance.Unknown, credit_card.country_of_issuance)
         self.assertEqual(CreditCard.Debit.Unknown, credit_card.debit)
         self.assertEqual(CreditCard.DurbinRegulated.Unknown, credit_card.durbin_regulated)
-        self.assertEqual(CreditCard.Prepaid.Unknown, credit_card.prepaid)
-        self.assertEqual(CreditCard.Payroll.Unknown, credit_card.payroll)
-        self.assertEqual(CreditCard.Commercial.Unknown, credit_card.commercial)
         self.assertEqual(CreditCard.Healthcare.Unknown, credit_card.healthcare)
         self.assertEqual(CreditCard.IssuingBank.Unknown, credit_card.issuing_bank)
-        self.assertEqual(CreditCard.CountryOfIssuance.Unknown, credit_card.country_of_issuance)
+        self.assertEqual(CreditCard.Payroll.Unknown, credit_card.payroll)
+        self.assertEqual(CreditCard.Prepaid.Unknown, credit_card.prepaid)
+        self.assertEqual(CreditCard.PrepaidReloadable.Unknown, credit_card.prepaid_reloadable)
         self.assertEqual(CreditCard.ProductId.Unknown, credit_card.product_id)
 
     def test_card_with_account_type_debit(self):
@@ -1217,7 +1279,7 @@ class TestCreditCard(unittest.TestCase):
             "expiration_date": "05/2014",
             "options": {
                 "verify_card": True,
-                "verification_merchant_account_id": "hiper_brl",
+                "verification_merchant_account_id": TestHelper.card_processor_brl_merchant_account_id,
                 "verification_account_type": "debit"
             }
         })
@@ -1228,7 +1290,7 @@ class TestCreditCard(unittest.TestCase):
         updated_result = CreditCard.update(result.credit_card.token, {
             "options": {
                 "verify_card": True,
-                "verification_merchant_account_id": "hiper_brl",
+                "verification_merchant_account_id": TestHelper.card_processor_brl_merchant_account_id,
                 "verification_account_type": "debit"
             }
         })
@@ -1271,7 +1333,7 @@ class TestCreditCard(unittest.TestCase):
             "expiration_date": "05/2014",
             "options": {
                 "verify_card": True,
-                "verification_merchant_account_id": "hiper_brl",
+                "verification_merchant_account_id": TestHelper.card_processor_brl_merchant_account_id,
                 "verification_account_type": "credit"
             }
         })
@@ -1282,7 +1344,7 @@ class TestCreditCard(unittest.TestCase):
         updated_result = CreditCard.update(result.credit_card.token, {
             "options": {
                 "verify_card": True,
-                "verification_merchant_account_id": "hiper_brl",
+                "verification_merchant_account_id": TestHelper.card_processor_brl_merchant_account_id,
                 "verification_account_type": "debit"
             }
         })

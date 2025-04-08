@@ -51,7 +51,7 @@ class TestCreditCardVerfication(unittest.TestCase):
                 "cvv": "737",
             },
             "options": {
-                "merchant_account_id": TestHelper.hiper_brl_merchant_account_id,
+                "merchant_account_id": TestHelper.card_processor_brl_merchant_account_id,
                 "account_type": "debit",
             },
         })
@@ -113,6 +113,41 @@ class TestCreditCardVerfication(unittest.TestCase):
         self.assertEqual(1, len(account_type_errors))
         self.assertEqual(ErrorCodes.Verification.Options.AccountTypeIsInvalid, account_type_errors[0].code)
 
+    def test_create_with_external_vault(self):
+        result = CreditCardVerification.create({
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "cardholder_name": "John Smith",
+                "expiration_date": "05/2012"
+            },
+            "external_vault": {
+                "status": "will_vault"
+            }
+            })
+
+        self.assertTrue(result.is_success)
+        verification = result.verification
+        self.assertEqual("1000", verification.processor_response_code)
+        self.assertEqual(ProcessorResponseTypes.Approved, verification.processor_response_type)
+
+    def test_create_with_risk_data(self):
+        result = CreditCardVerification.create({
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "cardholder_name": "John Smith",
+                "expiration_date": "05/2012"
+            },
+            "risk_data": {
+                "customer_browser": "IE7",
+                "customer_ip": "192.168.0.1"
+            }
+        })
+
+        self.assertTrue(result.is_success)
+        verification = result.verification
+        self.assertEqual("1000", verification.processor_response_code)
+        self.assertEqual(ProcessorResponseTypes.Approved, verification.processor_response_type)
+
     def test_find_with_verification_id(self):
         customer = Customer.create({
             "credit_card": {
@@ -143,14 +178,15 @@ class TestCreditCardVerfication(unittest.TestCase):
             CreditCardVerificationSearch.credit_card_cardholder_name == cardholder_name
         )
 
-        self.assertEqual(CreditCard.Prepaid.Unknown, found_verifications.first.credit_card['prepaid'])
-        self.assertEqual(CreditCard.Debit.Unknown, found_verifications.first.credit_card['debit'])
         self.assertEqual(CreditCard.Commercial.Unknown, found_verifications.first.credit_card['commercial'])
-        self.assertEqual(CreditCard.Healthcare.Unknown, found_verifications.first.credit_card['healthcare'])
-        self.assertEqual(CreditCard.Payroll.Unknown, found_verifications.first.credit_card['payroll'])
-        self.assertEqual(CreditCard.DurbinRegulated.Unknown, found_verifications.first.credit_card['durbin_regulated'])
-        self.assertEqual(CreditCard.IssuingBank.Unknown, found_verifications.first.credit_card['issuing_bank'])
         self.assertEqual(CreditCard.CountryOfIssuance.Unknown, found_verifications.first.credit_card['country_of_issuance'])
+        self.assertEqual(CreditCard.Debit.Unknown, found_verifications.first.credit_card['debit'])
+        self.assertEqual(CreditCard.DurbinRegulated.Unknown, found_verifications.first.credit_card['durbin_regulated'])
+        self.assertEqual(CreditCard.Healthcare.Unknown, found_verifications.first.credit_card['healthcare'])
+        self.assertEqual(CreditCard.IssuingBank.Unknown, found_verifications.first.credit_card['issuing_bank'])
+        self.assertEqual(CreditCard.Payroll.Unknown, found_verifications.first.credit_card['payroll'])
+        self.assertEqual(CreditCard.Prepaid.Unknown, found_verifications.first.credit_card['prepaid'])
+        self.assertEqual(CreditCard.PrepaidReloadable.Unknown, found_verifications.first.credit_card['prepaid_reloadable'])
         self.assertEqual(CreditCard.ProductId.Unknown, found_verifications.first.credit_card['product_id'])
 
     def test_create_success_network_response_code_text(self):
@@ -251,3 +287,17 @@ class TestCreditCardVerfication(unittest.TestCase):
         verification = result.verification
         self.assertEqual("1000", verification.processor_response_code)
         self.assertEqual(ProcessorResponseTypes.Approved, verification.processor_response_type)
+
+    def test_verification_with_ani_response_codes(self):
+        result = CreditCardVerification.create({
+            "credit_card": {
+                "number": CreditCardNumbers.Visa,
+                "expiration_date": "05/2029",
+            }
+        })
+
+        self.assertTrue(result.is_success)
+        verification = result.verification
+        self.assertEqual("1000", verification.processor_response_code)
+        self.assertEqual("I", verification.ani_first_name_response_code)
+        self.assertEqual("I", verification.ani_last_name_response_code)

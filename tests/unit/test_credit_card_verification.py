@@ -16,8 +16,16 @@ class TestCreditCardVerification(unittest.TestCase):
                 "number", "cvv", "cardholder_name", "cvv", "expiration_date", "expiration_month",
                 "expiration_year", {"billing_address": billing_address_params}
                 ]
+        external_vault_params = [
+                "previous_network_transaction_id",
+                "status"
+                ]
         options_params = [
                 "account_type", "amount", "merchant_account_id"
+                ]
+        risk_data_params = [
+                "customer_browser",
+                "customer_ip"
                 ]
         three_d_secure_pass_thru_params = [
                 "eci_flag",
@@ -31,9 +39,11 @@ class TestCreditCardVerification(unittest.TestCase):
                 ]
         expected = [
                 {"credit_card": credit_card_params},
+                {"external_vault": external_vault_params},
                 "intended_transaction_source",
                 {"options": options_params},
                 "payment_method_nonce",
+                {"risk_data": risk_data_params},
                 "three_d_secure_authentication_id",
                 {"three_d_secure_pass_thru": three_d_secure_pass_thru_params}]
 
@@ -81,6 +91,15 @@ class TestCreditCardVerification(unittest.TestCase):
         verification = CreditCardVerification(None, {'amount': '1.00'})
         self.assertEqual(verification.network_response_code, None)
         self.assertEqual(verification.network_response_text, None)
+
+    def test_constructor_when_ani_result_code_is_included(self):
+        attributes = {
+            'ani_first_name_response_code': 'M',
+            'ani_last_name_response_code': 'N'
+        }
+        verification = CreditCardVerification(None, attributes)
+        self.assertEqual(verification.ani_first_name_response_code, 'M')
+        self.assertEqual(verification.ani_last_name_response_code, 'N')
 
     def test_finding_empty_id_raises_not_found_exception(self):
         with self.assertRaises(NotFoundError):

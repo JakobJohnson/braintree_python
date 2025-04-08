@@ -7,6 +7,7 @@ from braintree.amex_express_checkout_card import AmexExpressCheckoutCard
 from braintree.android_pay_card import AndroidPayCard
 from braintree.apple_pay_card import ApplePayCard
 from braintree.apple_pay_gateway import ApplePayGateway
+from braintree.blik_alias import BlikAlias
 from braintree.braintree_gateway import BraintreeGateway
 from braintree.client_token import ClientToken
 from braintree.configuration import Configuration
@@ -34,6 +35,7 @@ from braintree.error_codes import ErrorCodes
 from braintree.error_result import ErrorResult
 from braintree.errors import Errors
 from braintree.europe_bank_account import EuropeBankAccount
+from braintree.graphql import *
 from braintree.liability_shift import LiabilityShift
 from braintree.local_payment_completed import LocalPaymentCompleted
 from braintree.local_payment_reversed import LocalPaymentReversed
@@ -48,6 +50,7 @@ from braintree.payment_method_customer_data_updated_metadata import PaymentMetho
 from braintree.payment_method_nonce import PaymentMethodNonce
 from braintree.payment_method_parser import parse_payment_method
 from braintree.paypal_account import PayPalAccount
+from braintree.paypal_payment_resource import PayPalPaymentResource
 from braintree.plan import Plan
 from braintree.plan_gateway import PlanGateway
 from braintree.processor_response_types import ProcessorResponseTypes

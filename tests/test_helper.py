@@ -86,19 +86,20 @@ def showwarning(*_):
 warnings.showwarning = showwarning
 
 class TestHelper(object):
+    adyen_merchant_account_id = "adyen_ma"
+    aib_swe_ma_merchant_account_id = "aib_swe_ma"
+    another_us_bank_merchant_account_id = "another_us_bank_merchant_account"
+    card_processor_brl_merchant_account_id = "card_processor_brl"
     default_merchant_account_id = "sandbox_credit_card"
+    fake_amex_direct_merchant_account_id = "fake_amex_direct_usd"
+    fake_first_data_merchant_account_id = "fake_first_data_merchant_account"
+    fake_venmo_account_merchant_account_id = "fake_first_data_venmo_account"
+    hiper_brl_merchant_account_id = "hiper_brl"
     non_default_merchant_account_id = "sandbox_credit_card_non_default"
     non_default_sub_merchant_account_id = "sandbox_sub_merchant_account"
+    pinless_debit_merchant_account_id = "pinless_debit"
     three_d_secure_merchant_account_id = "three_d_secure_merchant_account"
-    fake_amex_direct_merchant_account_id = "fake_amex_direct_usd"
-    fake_venmo_account_merchant_account_id = "fake_first_data_venmo_account"
-    fake_first_data_merchant_account_id = "fake_first_data_merchant_account"
     us_bank_merchant_account_id = "us_bank_merchant_account"
-    another_us_bank_merchant_account_id = "another_us_bank_merchant_account"
-    adyen_merchant_account_id = "adyen_ma"
-    hiper_brl_merchant_account_id = "hiper_brl"
-    card_processor_brl_merchant_account_id = "card_processor_brl"
-    aib_swe_ma_merchant_account_id = "aib_swe_ma"
 
     add_on_discount_plan = {
          "description": "Plan for integration tests -- with add-ons and discounts",
@@ -218,6 +219,7 @@ class TestHelper(object):
             "Accept": "application/xml",
             "Content-type": "application/x-www-form-urlencoded",
         }
+    
 
     @staticmethod
     def generate_decoded_client_token(params=None):
@@ -230,6 +232,7 @@ class TestHelper(object):
         decoded_client_token = b64decode(client_token).decode()
         return decoded_client_token
 
+
     @staticmethod
     def nonce_for_paypal_account(paypal_account_details):
         client_token = json.loads(TestHelper.generate_decoded_client_token())
@@ -239,6 +242,16 @@ class TestHelper(object):
 
         _, nonce = client.get_paypal_nonce(paypal_account_details)
         return nonce
+
+    @staticmethod
+    def nonce_for_paypal_order_payment():
+        http = ClientApiHttp.create()
+        _, payment_method_nonce = http.get_paypal_nonce({
+            "intent": "order",
+            "payment-token": "fake-paypal-payment-token",
+            "payer-id": "fake-paypal-payer-id"
+        })
+        return payment_method_nonce
 
     @staticmethod
     def random_token_block(x):

@@ -12,20 +12,22 @@ class TestCreditCard(unittest.TestCase):
 
     def test_create_signature(self):
         expected = ["billing_address_id", "cardholder_name", "cvv", "expiration_date", "expiration_month",
-            "expiration_year", "number", "token", "venmo_sdk_payment_method_code",
+            "expiration_year", "number", "token", "venmo_sdk_payment_method_code",  # NEXT_MJOR_VERSION remove venmo_sdk_payment_method_code
             "device_data", "payment_method_nonce",
             "device_session_id", "fraud_merchant_id",
             {
                 "billing_address": [
                     "company", "country_code_alpha2", "country_code_alpha3", "country_code_numeric", "country_name",
-                    "extended_address", "first_name", "last_name", "locality", "postal_code", "region", "street_address"
+                    "extended_address", "first_name", "last_name", "locality", "postal_code", "region", "street_address",
+                    "phone_number"
                 ]
             },
             {"options": [
                 "fail_on_duplicate_payment_method",
+                "fail_on_duplicate_payment_method_for_customer",
                 "make_default",
                 "skip_advanced_fraud_checking",
-                "venmo_sdk_session",
+                "venmo_sdk_session", # NEXT_MJOR_VERSION remove venmo_sdk_session
                 "verification_account_type",
                 "verification_amount",
                 "verification_merchant_account_id",
@@ -43,21 +45,22 @@ class TestCreditCard(unittest.TestCase):
 
     def test_update_signature(self):
         expected = ["billing_address_id", "cardholder_name", "cvv", "expiration_date", "expiration_month",
-            "expiration_year", "number", "token", "venmo_sdk_payment_method_code",
+            "expiration_year", "number", "token", "venmo_sdk_payment_method_code",  # NEXT_MJOR_VERSION remove venmo_sdk_payment_method_code
             "device_data", "payment_method_nonce",
             "device_session_id", "fraud_merchant_id",
             {
                 "billing_address": [
                     "company", "country_code_alpha2", "country_code_alpha3", "country_code_numeric", "country_name",
-                    "extended_address", "first_name", "last_name", "locality", "postal_code", "region", "street_address",
+                    "extended_address", "first_name", "last_name", "locality", "postal_code", "region", "street_address", "phone_number",
                     {"options": ["update_existing"]}
                 ]
             },
             {"options": [
                 "fail_on_duplicate_payment_method",
+                "fail_on_duplicate_payment_method_for_customer",
                 "make_default",
                 "skip_advanced_fraud_checking",
-                "venmo_sdk_session",
+                "venmo_sdk_session", # NEXT_MJOR_VERSION remove venmo_sdk_session
                 "verification_account_type",
                 "verification_amount",
                 "verification_merchant_account_id",
@@ -130,3 +133,26 @@ class TestCreditCard(unittest.TestCase):
         })
 
         self.assertEqual(None, credit_card.expiration_date)
+
+    def test_masked_number_with_standard_bin(self):
+        credit_card = CreditCard(
+            None,
+            {
+                "bin": "411111",
+                "last_4": "1111",
+            },
+        )
+
+        self.assertEqual(credit_card.masked_number, "411111******1111")
+
+    def test_masked_number_with_extended_bin(self):
+        credit_card = CreditCard(
+            None,
+            {
+                "bin": "411111",
+                "bin_extended": "41111111",
+                "last_4": "1111",
+            },
+        )
+
+        self.assertEqual(credit_card.masked_number, "41111111****1111")

@@ -12,13 +12,13 @@ long_description = """
 
 setup(
     name="braintree",
-    version="4.24.0",
+    version="4.34.0",
     description="Braintree Python Library",
     long_description=long_description,
     author="Braintree",
     author_email="support@braintreepayments.com",
     url="https://developer.paypal.com/braintree/docs/reference/overview",
-    packages=["braintree", "braintree.dispute_details", "braintree.exceptions", "braintree.exceptions.http", "braintree.merchant_account", "braintree.util", "braintree.test"],
+    packages=["braintree", "braintree.dispute_details", "braintree.exceptions", "braintree.graphql", "braintree.graphql.enums", "braintree.graphql.inputs", "braintree.graphql.types", "braintree.graphql.unions", "braintree.exceptions.http", "braintree.merchant_account", "braintree.util", "braintree.test"],
     package_data={"braintree": ["ssl/*"]},
     install_requires=["requests>=0.11.1,<3.0"],
     zip_safe=False,
@@ -28,6 +28,10 @@ setup(
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8"
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12"
     ]
 )

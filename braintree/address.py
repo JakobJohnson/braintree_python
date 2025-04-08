@@ -11,16 +11,18 @@ class Address(Resource):
 
         customer = braintree.Customer.create().customer
         result = braintree.Address.create({
-            "customer_id": customer.id,
-            "first_name": "John",
-            "last_name": "Doe",
             "company": "Braintree",
-            "street_address": "111 First Street",
+            "country_name": "United States of America",
+            "customer_id": customer.id,
             "extended_address": "Apartment 1",
+            "first_name": "John",
+            "international_phone": { "country_code": "1", "national_number": "3121234567" },
+            "last_name": "Doe",
             "locality": "Chicago",
-            "region": "IL",
+            "phone_number": "312-123-4567",
             "postal_code": "60606",
-            "country_name": "United States of America"
+            "region": "IL",
+            "street_address": "111 First Street"
         })
 
         print(result.customer.first_name)
@@ -29,20 +31,22 @@ class Address(Resource):
 
     def __repr__(self):
         detail_list = [
-            "customer_id",
             "company",
             "country_code_alpha2",
             "country_code_alpha3",
             "country_code_numeric",
             "country_name",
+            "customer_id",
             "extended_address",
             "first_name",
+            "international_phone",
             "last_name",
             "locality",
+            "phone_number",
             "postal_code",
             "region",
-            "street_address",
             "shipping_method",
+            "street_address"
         ]
         return super(Address, self).__repr__(detail_list)
 
@@ -57,6 +61,7 @@ class Address(Resource):
         * braintree.Address.ShippingMethod.Ground
         * braintree.Address.ShippingMethod.Electronic
         * braintree.Address.ShippingMethod.ShipToStore
+        * braintree.Address.ShippingMethod.PickupInStore
         """
         SameDay     = "same_day"
         NextDay     = "next_day"
@@ -64,6 +69,7 @@ class Address(Resource):
         Ground      = "ground"
         Electronic  = "electronic"
         ShipToStore = "ship_to_store"
+        PickupInStore = "pickup_in_store"
 
     @staticmethod
     def create(params=None):
@@ -128,7 +134,9 @@ class Address(Resource):
     def create_signature():
         return ["company", "country_code_alpha2", "country_code_alpha3", "country_code_numeric",
                 "country_name", "customer_id", "extended_address", "first_name",
-                "last_name", "locality", "phone_number", "postal_code", "region", "street_address"]
+                {"international_phone": ["country_code", "national_number"]},
+                "last_name", "locality", "phone_number",
+                "postal_code", "region", "street_address"]
 
     @staticmethod
     def update_signature():

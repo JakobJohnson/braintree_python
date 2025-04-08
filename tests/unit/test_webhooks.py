@@ -272,6 +272,19 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual("update_funding_information", notification.disbursement.follow_up_action)
         self.assertEqual(date(2014, 2, 9), notification.disbursement.disbursement_date)
 
+    def test_builds_notification_for_old_dispute_under_review(self):
+        sample_notification = WebhookTesting.sample_notification(
+            WebhookNotification.Kind.DisputeUnderReview,
+            "legacy_dispute_id"
+        )
+
+        notification = WebhookNotification.parse(sample_notification['bt_signature'], sample_notification['bt_payload'])
+
+        self.assertEqual(WebhookNotification.Kind.DisputeUnderReview, notification.kind)
+        self.assertEqual("legacy_dispute_id", notification.dispute.id)
+        self.assertEqual(Dispute.Status.UnderReview, notification.dispute.status)
+        self.assertEqual(Dispute.Kind.Chargeback, notification.dispute.kind)
+
     def test_builds_notification_for_old_dispute_opened(self):
         sample_notification = WebhookTesting.sample_notification(
             WebhookNotification.Kind.DisputeOpened,
@@ -365,6 +378,19 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual(WebhookNotification.Kind.DisputeExpired, notification.kind)
         self.assertEqual("legacy_dispute_id", notification.dispute.id)
         self.assertEqual(Dispute.Status.Expired, notification.dispute.status)
+        self.assertEqual(Dispute.Kind.Chargeback, notification.dispute.kind)
+
+    def test_builds_notification_for_new_dispute_under_review(self):
+        sample_notification = WebhookTesting.sample_notification(
+            WebhookNotification.Kind.DisputeUnderReview,
+            "my_id"
+        )
+
+        notification = WebhookNotification.parse(sample_notification['bt_signature'], sample_notification['bt_payload'])
+
+        self.assertEqual(WebhookNotification.Kind.DisputeUnderReview, notification.kind)
+        self.assertEqual("my_id", notification.dispute.id)
+        self.assertEqual(Dispute.Status.UnderReview, notification.dispute.status)
         self.assertEqual(Dispute.Kind.Chargeback, notification.dispute.kind)
 
     def test_builds_notification_for_new_dispute_opened(self):
@@ -543,6 +569,17 @@ class TestWebhooks(unittest.TestCase):
         self.assertEqual("my_id", notification.connected_merchant_paypal_status_changed.merchant_id)
         self.assertEqual("oauth_application_client_id", notification.connected_merchant_paypal_status_changed.oauth_application_client_id)
 
+    def test_builds_notification_for_refund_failed(self):
+        sample_notification = WebhookTesting.sample_notification(
+                WebhookNotification.Kind.RefundFailed,
+                "my_id"
+         )
+
+        notification = WebhookNotification.parse(sample_notification['bt_signature'], sample_notification['bt_payload'])
+
+        self.assertEqual(WebhookNotification.Kind.RefundFailed, notification.kind)
+        self.assertEqual("my_id", notification.transaction.id)
+
     def test_builds_notification_for_subscription_billing_skipped(self):
         sample_notification = WebhookTesting.sample_notification(
             WebhookNotification.Kind.SubscriptionBillingSkipped,
@@ -674,6 +711,7 @@ class TestWebhooks(unittest.TestCase):
                         <last-4>4444</last-4>
                         <payroll>Unknown</payroll>
                         <prepaid>Unknown</prepaid>
+                        <prepaid-reloadable>Unknown</prepaid-reloadable>
                         <product-id>Unknown</product-id>
                         <subscriptions type="array"/>
                         <token>credit_card_token</token>
@@ -784,8 +822,31 @@ class TestWebhooks(unittest.TestCase):
         local_payment_completed = notification.local_payment_completed
 
         self.assertEqual(WebhookNotification.Kind.LocalPaymentCompleted, notification.kind)
-        self.assertEqual("a-payment-id", local_payment_completed.payment_id)
+        self.assertEqual("a-bic", local_payment_completed.bic)
+        self.assertEqual("1234", local_payment_completed.iban_last_chars)
         self.assertEqual("a-payer-id", local_payment_completed.payer_id)
+        self.assertEqual("a-payer-name", local_payment_completed.payer_name)
+        self.assertEqual("a-payment-id", local_payment_completed.payment_id)
+        self.assertEqual("ee257d98-de40-47e8-96b3-a6954ea7a9a4", local_payment_completed.payment_method_nonce)
+        self.assertTrue(isinstance(local_payment_completed.transaction, Transaction))
+
+    def test_local_payment_completed_webhook_blik_one_click(self):
+        sample_notification = WebhookTesting.sample_notification(
+            WebhookNotification.Kind.LocalPaymentCompleted,
+            "blik_one_click_id"
+        )
+
+        notification = WebhookNotification.parse(sample_notification["bt_signature"], sample_notification["bt_payload"])
+        local_payment_completed = notification.local_payment_completed
+
+        self.assertEqual(WebhookNotification.Kind.LocalPaymentCompleted, notification.kind)
+        self.assertEqual("1234", local_payment_completed.iban_last_chars)
+        self.assertEqual("a-bic", local_payment_completed.bic)
+        self.assertEqual('alias-key-1', local_payment_completed.blik_aliases[0].key)
+        self.assertEqual('alias-label-1', local_payment_completed.blik_aliases[0].label)
+        self.assertEqual("a-payer-id", local_payment_completed.payer_id)
+        self.assertEqual("a-payer-name", local_payment_completed.payer_name)
+        self.assertEqual("a-payment-id", local_payment_completed.payment_id)
         self.assertEqual("ee257d98-de40-47e8-96b3-a6954ea7a9a4", local_payment_completed.payment_method_nonce)
         self.assertTrue(isinstance(local_payment_completed.transaction, Transaction))
 

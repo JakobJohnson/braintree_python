@@ -25,6 +25,7 @@ class TestPaymentMethodGateway(unittest.TestCase):
             {
                 "options": [
                     "fail_on_duplicate_payment_method",
+                    "fail_on_duplicate_payment_method_for_customer",
                     "make_default",
                     "skip_advanced_fraud_checking",
                     "us_bank_account_verification_method",
@@ -56,6 +57,7 @@ class TestPaymentMethodGateway(unittest.TestCase):
                                     "customer_id",
                                     "extended_address",
                                     "first_name",
+                                    {"international_phone": ["country_code", "national_number"]},
                                     "last_name",
                                     "locality",
                                     "phone_number",
@@ -95,15 +97,16 @@ class TestPaymentMethodGateway(unittest.TestCase):
             "number",
             "payment_method_nonce",
             "token",
-            "venmo_sdk_payment_method_code",
+            "venmo_sdk_payment_method_code",  # NEXT_MJOR_VERSION remove venmo_sdk_payment_method_code
             "device_session_id",
             "fraud_merchant_id",
             {
                 "options": [
+                    "fail_on_duplicate_payment_method_for_customer",
                     "make_default",
                     "skip_advanced_fraud_checking",
                     "us_bank_account_verification_method",
-                    "venmo_sdk_session",
+                    "venmo_sdk_session", # NEXT_MJOR_VERSION remove venmo_sdk_session
                     "verification_account_type",
                     "verification_add_ons",
                     "verification_amount",

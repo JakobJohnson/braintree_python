@@ -4,7 +4,7 @@ from braintree.resource import Resource
 from braintree.address import Address
 from braintree.configuration import Configuration
 from braintree.credit_card_verification import CreditCardVerification
-
+from enum import Enum
 
 class CreditCard(Resource):
     """
@@ -28,6 +28,7 @@ class CreditCard(Resource):
                 "postal_code": "60606",
                 "region": "IL",
                 "country_name": "United States of America"
+                "phone_number": "312-123-4567"
             },
             "options": {
                 "verify_card": True,
@@ -108,8 +109,26 @@ class CreditCard(Resource):
         No = "No"
         Unknown = "Unknown"
 
-    Commercial = DurbinRegulated = Debit = Healthcare = \
-            CountryOfIssuance = IssuingBank = Payroll = Prepaid = ProductId = CardTypeIndicator
+    class DebitNetwork(Enum):
+        """
+        Constants representing the debit networks used for processing a pinless debit transaction
+
+        * braintree.CreditCard.DebitNetwork.Accel
+        * braintree.CreditCard.DebitNetwork.Maestro
+        * braintree.CreditCard.DebitNetwork.Nyce
+        * braintree.CreditCard.DebitNetwork.Pulse
+        * braintree.CreditCard.DebitNetwork.Star
+        * braintree.CreditCard.DebitNetwork.Star_Access
+        """
+        Accel = "ACCEL"
+        Maestro= "MAESTRO"
+        Nyce = "NYCE"
+        Pulse = "PULSE"
+        Star = "STAR"
+        Star_Access = "STAR_ACCESS"
+
+    Commercial = CountryOfIssuance = Debit = DurbinRegulated = \
+            Healthcare = IssuingBank = Payroll = Prepaid = PrepaidReloadable = ProductId = CardTypeIndicator
 
     @staticmethod
     def create(params=None):
@@ -211,14 +230,16 @@ class CreditCard(Resource):
             "locality",
             "postal_code",
             "region",
-            "street_address"
+            "street_address",
+            "phone_number"
         ]
 
         options = [
             "fail_on_duplicate_payment_method",
+            "fail_on_duplicate_payment_method_for_customer",
             "make_default",
             "skip_advanced_fraud_checking",
-            "venmo_sdk_session",
+            "venmo_sdk_session",  # NEXT_MJOR_VERSION remove venmo_sdk_session
             "verification_account_type",
             "verification_amount",
             "verification_merchant_account_id",
@@ -248,7 +269,7 @@ class CreditCard(Resource):
             "expiration_year",
             "number",
             "token",
-            "venmo_sdk_payment_method_code",
+            "venmo_sdk_payment_method_code", # NEXT_MJOR_VERSION remove venmo_sdk_payment_method_code
             "device_data",
             "payment_method_nonce",
             "device_session_id", "fraud_merchant_id", # NEXT_MAJOR_VERSION remove device_session_id and fraud_merchant_id
@@ -302,4 +323,7 @@ class CreditCard(Resource):
         """
         Returns the masked number of the CreditCard.
         """
-        return self.bin + "******" + self.last_4
+        bin = self.bin_extended if hasattr(self, "bin_extended") else self.bin
+        mask_length = 16 - len(bin) - len(self.last_4)
+        mask = "*" * mask_length
+        return bin + mask + self.last_4
